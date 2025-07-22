@@ -26,7 +26,7 @@ def process_excel_file(df):
     Función principal que orquesta toda la lógica de conversión del archivo Excel.
     """
     
-    # --- 1. Reubicar Columnas y Renombrar Encabezados ---
+    # 1. Mapeo de columnas: (Origen, Destino)
     movimientos = [
         ("A", "W"), ("Y", "B"), ("H", "C"), ("U", "E"), ("X", "F"), ("Z", "J"),
         ("V", "L"), ("W", "O"), ("E", "AA"), ("F", "AB"), ("C", "K"), ("D", "AH"),
@@ -46,16 +46,17 @@ def process_excel_file(df):
     origen_indices = [letter_to_index(m[0]) for m in movimientos]
     destino_indices = [letter_to_index(m[1]) for m in movimientos]
 
+    # Crear un DataFrame de destino lo suficientemente grande
     max_col_index = max(destino_indices) if destino_indices else df.shape[1]
     df_nuevo = pd.DataFrame(np.nan, index=df.index, columns=range(max_col_index + 1))
 
     # Mover las columnas del DataFrame original al nuevo
     for orig_idx, dest_idx in zip(origen_indices, destino_indices):
         if orig_idx < df.shape[1]:
-            # Asignar la Serie completa para mantener la integridad del índice
-            df_nuevo.iloc[:, dest_idx] = df.iloc[:, orig_idx]
+            df_nuevo.iloc[:, dest_idx] = df.iloc[:, orig_idx].values
 
-    # Cadena completa de encabezados, extraída del VBA
+    # --- CORRECCIÓN CLAVE: Encabezados duplicados han sido renombrados para ser únicos ---
+    # Se modificaron los nombres que se repetían, como "TBN (mg KOH/g)" y "Water (Vol %)"
     header_string = (
         "Sample Status,Report Status,Date Reported,Asset ID,Unit ID,Unit Description,Asset Class,Position,"
         "Tested Lubricant,Service Level,Sample Bottle ID,Manufacturer,Alt Manufacturer,Model,Alt Model,"
@@ -74,7 +75,7 @@ def process_excel_file(df):
         "RESULT_Ca,Cd (Cadmium),RESULT_Cd,Cl (Chlorine ppm - Xray),RESULT_Cl (Chlorine ppm - Xray),"
         "Compatibility,RESULT_Compatibility,Coolant Indicator,RESULT_Coolant Indicator,Cr (Chromium),RESULT_Cr,"
         "Cu (Copper),RESULT_Cu,DAC(%Asphalt.),RESULT_DAC(%Asphalt.),Demul@54C  (min),RESULT_Demul@54C  (min),"
-        "Demul@54C (min),RESULT_Demul@54C (min),Demul@54C (Oil/Water/Emul/Time),RESULT_Demul@54C (Oil/Water/Emul/Time),"
+        "Demul@54C (min),RESULT_Demul@54C (min),Demul@54C (Oil/Water/Emul/Time),RESULT_Demul@54C (Oil/Water/E/T),"
         "Demulsibility @54C (time-min),RESULT_Demulsibility @54C (time-min),Demulsibility @54C (oil),"
         "RESULT_Demulsibility @54C (oil),Demulsibility @54C (water),RESULT_Demulsibility @54C (water),"
         "Demulsibility @54C (emulsion),RESULT_Demulsibility @54C (emulsion),Fe (Iron),RESULT_Fe (Iron),"
@@ -93,11 +94,11 @@ def process_excel_file(df):
         "RPVOT (Min),RESULT_RPVOT (Min),RULER-Amine (% vs new),RESULT_RULER-Amine (% vs new),"
         "RULER-Phenol (% vs new),RESULT_RULER-Phenol (% vs new),SAE Viscosity Grade,RESULT_SAE Viscosity Grade,"
         "Si (Silicon),RESULT_Si,Sn (Tin),RESULT_Sn,Soot (Wt%),RESULT_Soot (Wt%),TAN (mg KOH/g),"
-        "RESULT_TAN (mg KOH/g),TBN (mg KOH/g),RESULT_TBN (mg KOH/g) 2,TBN (mg KOH/g),RESULT_TBN (mg KOH/g) 2,"
+        "RESULT_TAN (mg KOH/g),TBN (mg KOH/g),RESULT_TBN (mg KOH/g) 2,TBN (mg KOH/g) 3,RESULT_TBN (mg KOH/g) 3,"
         "Ti (Titanium),RESULT_Ti,UC Rating,RESULT_UC Rating,V (Vanadium),RESULT_V,Visc@100C (cSt),"
         "RESULT_Visc@100C (cSt),Visc@40C (cSt),RESULT_Visc@40C (cSt),Water (Hot Plate),RESULT_Water (Hot Plate),"
-        "Water (Vol %),RESULT_Water (Vol%),Water (Vol%),RESULT_Water (Vol%) 2,Water (Vol.%),"
-        "RESULT_Water (Vol%) 3,Water Free est.,RESULT_Water Free est.,Zn (Zinc),"
+        "Water (Vol %),RESULT_Water (Vol%) 2,Water (Vol %) 3,RESULT_Water (Vol%) 3,Water (Vol.%),"
+        "RESULT_Water (Vol.%) 2,Water Free est.,RESULT_Water Free est.,Zn (Zinc),"
         "RESULT_Zn,Zn (Zinc) 2,RESULT_Zn 2,Soot (Wt%)- No Ref,RESULT_Soot (Wt%)- No Ref,Oxidation (Abs/cm)- no Ref,RESULT_Oxidation (Abs/cm)- no Ref,"
         "Nitration (Abs/cm)- no Ref,RESULT_Nitration (Abs/cm)- no Ref,Water (Abs/cm)- no Ref,RESULT_Water (Abs/cm) - no Ref,Aluminum - GR,RESULT_Aluminum - GR,"
         "Antimony - gr,RESULT_Antimony - gr,Appearance - gr,RESULT_Appearance - gr,Barium - GR,RESULT_Barium - GR,Boron - GR,RESULT_Boron - GR,"
@@ -131,40 +132,35 @@ def process_excel_file(df):
         "RESULT_Blotter Spot Dispersancy,Blotter Spot Opacity,RESULT_Blotter Spot Opacity,Blotter Spot Note,RESULT_Blotter Spot Note"
     )
     new_headers = header_string.split(',')
-    num_headers = len(new_headers)
-
-    # Reindexar para asegurar el tamaño correcto y asignar nombres
-    df_final = df_nuevo.reindex(columns=range(num_headers))
+    
+    # Asegurar que el DataFrame tenga el número correcto de columnas y asignar los nombres
+    df_final = df_nuevo.reindex(columns=range(len(new_headers)))
     df_final.columns = new_headers
 
-    # --- 2. Convertir y Formatear Fechas ---
+    # Convertir columnas de fecha
     columnas_fecha = ["Date Reported", "Date Sampled", "Date Registered", "Date Received"]
     for col in columnas_fecha:
         if col in df_final.columns:
             df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
 
-    # --- 3. Formatear Números ---
-    # CORRECCIÓN CLAVE: La lógica de formato ahora opera sobre las columnas de destino correctas.
-    columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA",
-                               "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM",
-                               "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
+    # Convertir columnas numéricas
+    columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA", "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM", "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
     columnas_decimales_letras = ["DY", "GL", "GN", "GP", "GR", "GZ", "HB", "HH", "HJ"]
 
     for col_letter in columnas_enteras_letras:
         col_idx = letter_to_index(col_letter)
         if col_idx < len(df_final.columns):
             col_name = df_final.columns[col_idx]
-            # Usar .loc para evitar SettingWithCopyWarning
-            df_final.loc[:, col_name] = pd.to_numeric(df_final[col_name], errors='coerce')
-            df_final[col_name] = df_final[col_name].astype(pd.Int64Dtype())
+            df_final[col_name] = pd.to_numeric(df_final[col_name], errors='coerce')
+            df_final[col_name] = df_final[col_name].astype('Int64') # Nullable Integer
     
     for col_letter in columnas_decimales_letras:
         col_idx = letter_to_index(col_letter)
         if col_idx < len(df_final.columns):
             col_name = df_final.columns[col_idx]
-            df_final.loc[:, col_name] = pd.to_numeric(df_final[col_name], errors='coerce')
+            df_final[col_name] = pd.to_numeric(df_final[col_name], errors='coerce')
 
-    # --- 4. Completar Estado ---
+    # Completar estado de la muestra
     if 'Report Status' in df_final.columns and 'Sample Status' in df_final.columns:
         mask = df_final['Report Status'].notna() & (df_final['Report Status'] != '')
         df_final.loc[mask, 'Sample Status'] = 'Completed'
@@ -180,28 +176,22 @@ def to_excel(df):
         workbook = writer.book
         worksheet = writer.sheets['MobilServ_Data']
         
+        # Formatos numéricos
         formato_entero = '0'
         formato_decimal = '0.00'
 
         columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA", "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM", "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
         columnas_decimales_letras = ["DY", "GL", "GN", "GP", "GR", "GZ", "HB", "HH", "HJ"]
 
-        # Lógica de formato simplificada y corregida
-        for col_letter in columnas_enteras_letras:
-            col_idx_excel = letter_to_index(col_letter) + 1
-            if col_idx_excel <= len(df.columns):
-                for row in range(2, worksheet.max_row + 1):
-                    cell = worksheet.cell(row=row, column=col_idx_excel)
-                    if cell.value is not None and isinstance(cell.value, (int, float)):
-                        cell.number_format = formato_entero
-        
-        for col_letter in columnas_decimales_letras:
-            col_idx_excel = letter_to_index(col_letter) + 1
-            if col_idx_excel <= len(df.columns):
-                for row in range(2, worksheet.max_row + 1):
-                    cell = worksheet.cell(row=row, column=col_idx_excel)
-                    if cell.value is not None and isinstance(cell.value, (int, float)):
-                        cell.number_format = formato_decimal
+        # Lógica de formato optimizada
+        for col_letter, number_format in [(columnas_enteras_letras, formato_entero), (columnas_decimales_letras, formato_decimal)]:
+            for letter in col_letter:
+                col_idx_excel = letter_to_index(letter) + 1 # +1 para índice base 1 de Excel
+                if col_idx_excel <= len(df.columns):
+                    for row in range(2, worksheet.max_row + 1):
+                        cell = worksheet.cell(row=row, column=col_idx_excel)
+                        if cell.value is not None and isinstance(cell.value, (int, float)):
+                            cell.number_format = number_format
 
     return output.getvalue()
 
@@ -213,23 +203,13 @@ st.markdown("Transforma archivos de **Smart Assistance** al formato requerido po
 
 with st.expander("📖 Manual de Uso (Haga clic para expandir)"):
     st.markdown("""
-    Esta aplicación le permite convertir archivos de Excel de forma rápida y sencilla. Siga estos pasos:
-
-    1.  **Cargar el Archivo**:
-        -   Haga clic en el botón **"Browse files"** o arrastre y suelte su archivo de Excel en el área designada.
-        -   Asegúrese de que el archivo tenga el formato original de "Smart Assistance".
-        -   El archivo debe tener los datos en una hoja llamada **"Sheet"**.
-
-    2.  **Iniciar la Conversión**:
-        -   Una vez cargado el archivo, aparecerá un botón llamado **"Iniciar Proceso de Conversión"**.
-        -   Haga clic en este botón para comenzar la transformación de los datos.
-
-    3.  **Descargar el Resultado**:
-        -   Después de unos segundos, el proceso finalizará y se mostrará un mensaje de éxito.
-        -   Aparecerá un botón de **"Descargar archivo en formato MobilServ"**.
-        -   Haga clic en él para guardar el archivo convertido en su computador.
+    Siga estos pasos para convertir su archivo:
+    1.  **Cargar Archivo**: Use el botón "Browse files" para subir su Excel. Asegúrese de que la hoja de datos se llame **"Sheet"**.
+    2.  **Iniciar Conversión**: Presione el botón "Iniciar Proceso de Conversión".
+    3.  **Descargar Resultado**: Una vez finalizado, presione "Descargar archivo" para guardar el resultado.
     """)
 
+# ... (El resto de la UI permanece igual, es funcional) ...
 try:
     logo_smart = Image.open("Smart Assistance.png")
     logo_mobil = Image.open("MobilServ.png")
@@ -245,7 +225,7 @@ except FileNotFoundError:
 
 st.divider()
 
-st.header("1. Adjunte el archivo de Excel con formato Smart Assistance")
+st.header("1. Adjunte el archivo de Excel")
 uploaded_file = st.file_uploader(
     "El archivo debe contener una hoja llamada 'Sheet'",
     type=["xlsx", "xls"]
@@ -265,19 +245,17 @@ if uploaded_file is not None:
                 
                 st.session_state.processed_data = to_excel(processed_df)
                 st.session_state.processing_complete = True
-                # Guardar el nombre del archivo para la descarga
-                if 'file_name' not in st.session_state:
-                    st.session_state.file_name = uploaded_file.name
+                st.session_state.file_name = uploaded_file.name
 
             except Exception as e:
-                st.error(f"Ocurrió un error durante el procesamiento: {e}")
-                st.error("Por favor, asegúrese de que el archivo cargado sea válido, no esté corrupto y contenga una hoja llamada 'Sheet'.")
-                st.exception(e) # Esto mostrará el traceback completo para depuración
+                st.error(f"Ocurrió un error inesperado durante el procesamiento: {e}")
+                st.error("Asegúrese de que el archivo es válido y la hoja se llama 'Sheet'.")
+                st.exception(e) # Muestra el error detallado para depuración
                 st.session_state.processing_complete = False
 
-if 'processing_complete' in st.session_state and st.session_state.processing_complete:
+if 'processing_complete' in st.session_state and st.session_state.get('processing_complete', False):
     st.balloons()
-    st.success("✔️ Proceso de Conversión de formato Exitoso :)")
+    st.success("✔️ ¡Proceso de Conversión completado exitosamente!")
     st.header("3. Descargue el archivo final")
     
     st.download_button(
@@ -295,4 +273,3 @@ st.markdown("""
     <p>Desarrollado por: <strong>Roberto Alvarez / RCA Smart Tools.</strong></p>
 </div>
 """, unsafe_allow_html=True)
-

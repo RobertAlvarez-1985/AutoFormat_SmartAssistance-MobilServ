@@ -94,7 +94,7 @@ def process_excel_file(df):
         "RPVOT (Min),RESULT_RPVOT (Min),RULER-Amine (% vs new),RESULT_RULER-Amine (% vs new),"
         "RULER-Phenol (% vs new),RESULT_RULER-Phenol (% vs new),SAE Viscosity Grade,RESULT_SAE Viscosity Grade,"
         "Si (Silicon),RESULT_Si,Sn (Tin),RESULT_Sn,Soot (Wt%),RESULT_Soot (Wt%),TAN (mg KOH/g),"
-        "RESULT_TAN (mg KOH/g),TBN (mg KOH/g),RESULT_TBN (mg KOH/g) 2,TBN (mg KOH/g) 3,RESULT_TBN (mg KOH/g) 3,"
+        "RESULT_TAN (mg KOH/g),TBN (mg KOH/g),RESULT_TBN (mg KOH/g),TBN (mg KOH/g) 2,RESULT_TBN (mg KOH/g) 2,"
         "Ti (Titanium),RESULT_Ti,UC Rating,RESULT_UC Rating,V (Vanadium),RESULT_V,Visc@100C (cSt),"
         "RESULT_Visc@100C (cSt),Visc@40C (cSt),RESULT_Visc@40C (cSt),Water (Hot Plate),RESULT_Water (Hot Plate),"
         "Water (Vol %),RESULT_Water (Vol%) 2,Water (Vol %) 3,RESULT_Water (Vol%) 3,Water (Vol.%),"

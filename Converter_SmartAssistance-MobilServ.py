@@ -282,7 +282,7 @@ st.divider()
 # Carga de Archivo
 st.header("1. Adjunte el archivo de Excel con formato Smart Assistance")
 uploaded_file = st.file_uploader(
-    "El archivo debe contener una hoja llamada 'Plantilla'",
+    "El archivo debe contener una hoja llamada 'Sheet'",
     type=["xlsx", "xls"]
 )
 
@@ -294,8 +294,8 @@ if uploaded_file is not None:
     if st.button("Iniciar Proceso de Conversión", type="primary", use_container_width=True):
         with st.spinner("Procesando... Por favor espere."):
             try:
-                # Leer los datos de la hoja "Plantilla" sin encabezados
-                input_df = pd.read_excel(uploaded_file, sheet_name="Plantilla", header=None)
+                # Leer los datos de la hoja "Sheet" sin encabezados
+                input_df = pd.read_excel(uploaded_file, sheet_name="Sheet", header=None)
                 
                 # Procesar el DataFrame
                 processed_df = process_excel_file(input_df)
@@ -306,7 +306,7 @@ if uploaded_file is not None:
 
             except Exception as e:
                 st.error(f"Ocurrió un error durante el procesamiento: {e}")
-                st.error("Asegúrese de que el archivo cargado sea válido y contenga una hoja llamada 'Plantilla'.")
+                st.error("Asegúrese de que el archivo cargado sea válido y contenga una hoja llamada 'Sheet'.")
                 st.session_state.processing_complete = False
 
 # Notificación y Descarga Post-Conversión

@@ -53,17 +53,20 @@ def process_excel_file(df):
     origen_indices = [letter_to_index(m[0]) for m in movimientos]
     destino_indices = [letter_to_index(m[1]) for m in movimientos]
 
-    # Crear un nuevo DataFrame para los datos reordenados
-    max_col_index = max(destino_indices)
-    df_nuevo = pd.DataFrame(np.nan, index=df.index, columns=range(max_col_index + 1))
+    # Calcular el número máximo de columnas necesarias para el nuevo DataFrame
+    max_col_index = max(destino_indices) if destino_indices else -1
+    # Asegurarse de que el nuevo DataFrame tenga al menos el número de columnas del original si no hay movimientos grandes
+    required_cols = max(max_col_index + 1, df.shape[1]) 
+    
+    df_nuevo = pd.DataFrame(np.nan, index=df.index, columns=range(required_cols))
 
     # Copiar las columnas del DataFrame original al nuevo
     for i, (orig_idx, dest_idx) in enumerate(zip(origen_indices, destino_indices)):
         if orig_idx < len(df.columns):
-            df_nuevo.iloc[:, dest_idx] = df.iloc[:, orig_idx].values
+            # Asignar directamente la Serie de Pandas para mayor robustez
+            df_nuevo.iloc[:, dest_idx] = df.iloc[:, orig_idx]
         else:
-            # Advertencia si una columna de origen no existe en el archivo cargado
-            st.warning(f"Advertencia: La columna de origen '{movimientos[i][0]}' no se encontró en el archivo. Se omitirá en el destino.")
+            st.warning(f"Advertencia: La columna de origen '{movimientos[i][0]}' (índice {orig_idx}) no se encontró en el archivo. Se omitirá en el destino.")
     
     # Cadena completa de encabezados, extraída del VBA
     header_string = (
@@ -148,15 +151,14 @@ def process_excel_file(df):
         # Añadir columnas vacías si es necesario
         num_cols_to_add = num_headers - df_nuevo.shape[1]
         for _ in range(num_cols_to_add):
-            df_nuevo[df_nuevo.shape[1]] = np.nan
+            df_nuevo[df_nuevo.shape[1]] = np.nan # This adds a new column named with its index
             
     # Asignar los nuevos encabezados a las primeras N columnas
-    final_columns = new_headers + [f"Unnamed: {i}" for i in range(num_headers, df_nuevo.shape[1])]
-    df_nuevo.columns = final_columns
+    # We slice df_nuevo to only include up to num_headers columns before assigning,
+    # and then create the final_columns list based on that.
+    df_final = df_nuevo.iloc[:, :num_headers].copy() # .copy() to avoid SettingWithCopyWarning
+    df_final.columns = new_headers # Directly assign new_headers
     
-    # Recortar el DataFrame para que solo contenga las columnas con los nuevos encabezados
-    df_final = df_nuevo.iloc[:, :num_headers]
-
     # --- 2. Convertir y Formatear Fechas (Macro: ConvertirYFormatearFechas) ---
     columnas_fecha = ["Date Reported", "Date Sampled", "Date Registered", "Date Received"]
     for col in columnas_fecha:
@@ -186,13 +188,15 @@ def process_excel_file(df):
                 pass 
             elif letra in columnas_enteras_letras:
                 # Convertir a tipo entero que admite nulos (NaN)
-                df_final[nombre_col] = df_final[nombre_col].astype('Int64')
+                # Using pd.Int64Dtype() for nullable integer type
+                df_final[nombre_col] = df_final[nombre_col].astype(pd.Int64Dtype())
 
     # --- 4. Completar Estado (Macro: CompletarEstadoColumnaA) ---
     # La columna 'A' original se convierte en 'Sample Status'.
     # La columna 'B' original se convierte en 'Report Status'.
     if 'Report Status' in df_final.columns and 'Sample Status' in df_final.columns:
         # Si la celda en 'Report Status' no está vacía, poner "Completed" en 'Sample Status'
+        # Usamos .loc con .copy() para evitar SettingWithCopyWarning
         df_final.loc[df_final['Report Status'].notna() & (df_final['Report Status'] != ''), 'Sample Status'] = 'Completed'
 
     return df_final
@@ -222,17 +226,23 @@ def to_excel(df):
             idx = letter_to_index(col_letter)
             if idx < len(header_list):
                 col_name = header_list[idx]
-                col_idx_in_df = df.columns.get_loc(col_name) + 1
-                for cell in worksheet[chr(ord('A') + col_idx_in_df -1)]:
-                    cell.number_format = formato_entero
+                col_idx_in_df = df.columns.get_loc(col_name) + 1 # +1 for 1-based indexing in Excel
+                # Use worksheet.cell instead of worksheet[column_letter] for more direct access
+                # Iterate through rows to apply format
+                for row in range(2, worksheet.max_row + 1): # Start from row 2 (data rows)
+                    cell = worksheet.cell(row=row, column=col_idx_in_df)
+                    if cell.value is not None: # Apply format only if cell has a value
+                        cell.number_format = formato_entero
 
         for col_letter in columnas_decimales_letras:
             idx = letter_to_index(col_letter)
             if idx < len(header_list):
                 col_name = header_list[idx]
                 col_idx_in_df = df.columns.get_loc(col_name) + 1
-                for cell in worksheet[chr(ord('A') + col_idx_in_df -1)]:
-                    cell.number_format = formato_decimal
+                for row in range(2, worksheet.max_row + 1):
+                    cell = worksheet.cell(row=row, column=col_idx_in_df)
+                    if cell.value is not None:
+                        cell.number_format = formato_decimal
 
     processed_data = output.getvalue()
     return processed_data
@@ -250,7 +260,7 @@ with st.expander("📖 Manual de Uso (Haga clic para expandir)"):
     1.  **Cargar el Archivo**:
         -   Haga clic en el botón **"Browse files"** o arrastre y suelte su archivo de Excel en el área designada.
         -   Asegúrese de que el archivo tenga el formato original de "Smart Assistance".
-        -   El archivo debe tener los datos en una hoja llamada **"Plantilla"**.
+        -   El archivo debe tener los datos en una hoja llamada **"Sheet"** (asegúrese de que este es el nombre de la hoja en su archivo Excel).
 
     2.  **Iniciar la Conversión**:
         -   Una vez cargado el archivo, aparecerá un botón llamado **"Iniciar Proceso de Conversión"**.
@@ -269,11 +279,11 @@ try:
     
     col1, col2, col3 = st.columns([2, 1, 2])
     with col1:
-        st.image(logo_smart, caption="Formato de Origen", use_column_width=True)
+        st.image(logo_smart, caption="Formato de Origen", use_container_width=True) # FIXED
     with col2:
         st.markdown("<h1 style='text-align: center; color: #007bff; margin-top: 50px;'>➡️</h1>", unsafe_allow_html=True)
     with col3:
-        st.image(logo_mobil, caption="Formato de Destino", use_column_width=True)
+        st.image(logo_mobil, caption="Formato de Destino", use_container_width=True) # FIXED
 except FileNotFoundError:
     st.info("Logos no encontrados. Coloque 'Smart Assistance.png' y 'MobilServ.png' en la misma carpeta que la aplicación para una mejor visualización.")
 
@@ -282,7 +292,7 @@ st.divider()
 # Carga de Archivo
 st.header("1. Adjunte el archivo de Excel con formato Smart Assistance")
 uploaded_file = st.file_uploader(
-    "El archivo debe contener una hoja llamada 'Sheet'",
+    "El archivo debe contener una hoja llamada 'Sheet'", # FIXED: Consistent with read_excel
     type=["xlsx", "xls"]
 )
 
@@ -295,7 +305,7 @@ if uploaded_file is not None:
         with st.spinner("Procesando... Por favor espere."):
             try:
                 # Leer los datos de la hoja "Sheet" sin encabezados
-                input_df = pd.read_excel(uploaded_file, sheet_name="Sheet", header=None)
+                input_df = pd.read_excel(uploaded_file, sheet_name="Sheet", header=None) # FIXED: Consistent sheet name
                 
                 # Procesar el DataFrame
                 processed_df = process_excel_file(input_df)

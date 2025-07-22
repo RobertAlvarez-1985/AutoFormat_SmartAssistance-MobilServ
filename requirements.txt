@@ -1,6 +1,5 @@
 streamlit
 pandas
 openpyxl
-x1rd
 numpy
 pillow

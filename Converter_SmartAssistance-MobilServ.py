@@ -11,10 +11,10 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- Funciones de Lógica de Conversión (Traducción de VBA a Python) ---
+# --- Funciones de Lógica de Conversión ---
 
 def letter_to_index(letter):
-    """Convierte una letra de columna de Excel (A, B, ..., Z, AA, etc.) a un índice numérico (base 0)."""
+    """Convierte una letra de columna de Excel a un índice numérico (base 0)."""
     letter = letter.upper()
     result = 0
     for char in letter:
@@ -24,51 +24,39 @@ def letter_to_index(letter):
 def process_excel_file(df):
     """
     Función principal que orquesta toda la lógica de conversión del archivo Excel.
-    Replica la funcionalidad de las macros de VBA en Python usando pandas.
     """
     
-    # --- 1. Reubicar Columnas y Renombrar Encabezados (Macro: ReubicarColumnasYRenombrarEncabezados_Mejorado) ---
-    
-    # Definición de los movimientos de columnas: (Origen, Destino)
+    # --- 1. Reubicar Columnas y Renombrar Encabezados ---
     movimientos = [
-        # Grupo 1: Información de la Muestra
+        # ... (la lista de movimientos permanece sin cambios) ...
         ("A", "W"), ("Y", "B"), ("H", "C"), ("U", "E"), ("X", "F"), ("Z", "J"),
         ("V", "L"), ("W", "O"), ("E", "AA"), ("F", "AB"), ("C", "K"), ("D", "AH"),
         ("G", "AC"), ("I", "BB"), ("J", "BC"), ("K", "BD"), ("L", "BE"), ("M", "BF"),
         ("N", "BG"), ("O", "I"), ("B", "R"),
-        # Grupo 2: Variables: IPQ+ elementos desgaste + aditivos + Cont. + Código ISO
         ("IO", "FW"), ("MI", "CC"), ("AJ", "CG"), ("FK", "CY"), ("BV", "DA"),
         ("IE", "DS"), ("OZ", "GT"), ("MK", "FS"), ("JQ", "ES"), ("JJ", "EM"),
         ("HK", "GJ"), ("OB", "GH"), ("OG", "EQ"), ("MM", "EE"), ("PD", "GX"),
         ("BI", "CK"), ("BD", "CM"), ("BM", "CO"), ("BL", "CQ"), ("JE", "EI"),
         ("JF", "EK"), ("HQ", "FA"), ("PO", "HN"), ("BZ", "FK"), ("FB", "FM"),
         ("FC", "FO"), ("FA", "FQ"),
-        # Grupo 3: Variables: OXI, NIT, TAN, TBN, HOLLIN, FUEL DIL, AGUA, VISC
         ("KB", "EW"), ("JR", "EU"), ("JU", "GN"), ("IY", "GP"), ("JV", "GR"),
         ("IG", "GL"), ("GO", "DY"), ("AE", "HH"), ("CS", "HJ"), ("EF", "PI"),
         ("PG", "GZ"), ("CE", "EO"), ("PC", "GV"), ("AD", "HD"), ("PH", "HB")
     ]
 
-    # Convertir letras a índices numéricos
     origen_indices = [letter_to_index(m[0]) for m in movimientos]
     destino_indices = [letter_to_index(m[1]) for m in movimientos]
 
-    # Calcular el número máximo de columnas necesarias para el nuevo DataFrame
-    max_col_index = max(destino_indices) if destino_indices else -1
-    # Asegurarse de que el nuevo DataFrame tenga al menos el número de columnas del original si no hay movimientos grandes
-    required_cols = max(max_col_index + 1, df.shape[1]) 
-    
-    df_nuevo = pd.DataFrame(np.nan, index=df.index, columns=range(required_cols))
+    max_col_index = max(destino_indices) if destino_indices else df.shape[1]
+    df_nuevo = pd.DataFrame(np.nan, index=df.index, columns=range(max_col_index + 1))
 
-    # Copiar las columnas del DataFrame original al nuevo
-    for i, (orig_idx, dest_idx) in enumerate(zip(origen_indices, destino_indices)):
-        if orig_idx < len(df.columns):
-            # Asignar directamente la Serie de Pandas para mayor robustez
-            df_nuevo.iloc[:, dest_idx] = df.iloc[:, orig_idx]
-        else:
-            st.warning(f"Advertencia: La columna de origen '{movimientos[i][0]}' (índice {orig_idx}) no se encontró en el archivo. Se omitirá en el destino.")
-    
-    # Cadena completa de encabezados, extraída del VBA
+    for orig_idx, dest_idx in zip(origen_indices, destino_indices):
+        if orig_idx < df.shape[1]:
+            df_nuevo.iloc[:, dest_idx] = df.iloc[:, orig_idx].values
+        # else:
+            # st.warning(f"Advertencia: La columna de origen con índice {orig_idx} no existe en el archivo.")
+
+    # --- CORRECCIÓN PRINCIPAL: Renombrar y finalizar el DataFrame de forma robusta ---
     header_string = (
         "Sample Status,Report Status,Date Reported,Asset ID,Unit ID,Unit Description,Asset Class,Position,"
         "Tested Lubricant,Service Level,Sample Bottle ID,Manufacturer,Alt Manufacturer,Model,Alt Model,"
@@ -144,123 +132,88 @@ def process_excel_file(df):
         "RESULT_Blotter Spot Dispersancy,Blotter Spot Opacity,RESULT_Blotter Spot Opacity,Blotter Spot Note,RESULT_Blotter Spot Note"
     )
     new_headers = header_string.split(',')
-    
-    # Asegurarse de que el DataFrame tenga suficientes columnas para los nuevos encabezados
     num_headers = len(new_headers)
-    if num_headers > df_nuevo.shape[1]:
-        # Añadir columnas vacías si es necesario
-        num_cols_to_add = num_headers - df_nuevo.shape[1]
-        for _ in range(num_cols_to_add):
-            df_nuevo[df_nuevo.shape[1]] = np.nan # This adds a new column named with its index
-            
-    # Asignar los nuevos encabezados a las primeras N columnas
-    # We slice df_nuevo to only include up to num_headers columns before assigning,
-    # and then create the final_columns list based on that.
-    df_final = df_nuevo.iloc[:, :num_headers].copy() # .copy() to avoid SettingWithCopyWarning
-    df_final.columns = new_headers # Directly assign new_headers
-    
-    # --- 2. Convertir y Formatear Fechas (Macro: ConvertirYFormatearFechas) ---
+
+    # Reindexar el DataFrame para que coincida exactamente con el número de encabezados.
+    # Esto añade columnas NaN si es necesario o trunca las sobrantes de forma segura.
+    df_final = df_nuevo.reindex(columns=range(num_headers))
+    df_final.columns = new_headers # Asignar los nombres de columna finales
+
+    # --- 2. Convertir y Formatear Fechas ---
     columnas_fecha = ["Date Reported", "Date Sampled", "Date Registered", "Date Received"]
     for col in columnas_fecha:
         if col in df_final.columns:
-            # errors='coerce' convierte los valores no válidos en NaT (Not a Time)
             df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
-            # Para la descarga en Excel, es mejor dejarlo como datetime y aplicar formato al escribir.
-            # Para visualización o si se requiere como texto:
-            # df_final[col] = df_final[col].dt.strftime('%m/%d/%Y')
 
-    # --- 3. Formatear Números (Macro: Formato_NumeroEntero_Decimal_Columnas) ---
-    # Columnas que deben ser números enteros
-    columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA",
-                               "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM",
-                               "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
-    # Columnas que deben ser números decimales
+    # --- 3. Formatear Números ---
+    columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA", "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM", "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
     columnas_decimales_letras = ["DY", "GL", "GN", "GP", "GR", "GZ", "HB", "HH", "HJ"]
+    
+    mapa_letras_a_indices = {letra: letter_to_index(letra) for letra in columnas_enteras_letras + columnas_decimales_letras}
 
-    # Mapear letras a los nuevos nombres de encabezado
-    mapa_letras_a_nombres = {letra: new_headers[letter_to_index(letra)] for letra in columnas_enteras_letras + columnas_decimales_letras if letter_to_index(letra) < len(new_headers)}
+    for letra, idx in mapa_letras_a_indices.items():
+        if idx < len(df_final.columns):
+            col_name = df_final.columns[idx]
+            df_final[col_name] = pd.to_numeric(df_final[col_name], errors='coerce')
+            if letra in columnas_enteras_letras:
+                df_final[col_name] = df_final[col_name].astype(pd.Int64Dtype())
 
-    for letra, nombre_col in mapa_letras_a_nombres.items():
-        if nombre_col in df_final.columns:
-            df_final[nombre_col] = pd.to_numeric(df_final[nombre_col], errors='coerce')
-            if letra in columnas_decimales_letras:
-                # El formato se aplica al guardar en Excel, aquí solo nos aseguramos de que sea numérico (float)
-                pass 
-            elif letra in columnas_enteras_letras:
-                # Convertir a tipo entero que admite nulos (NaN)
-                # Using pd.Int64Dtype() for nullable integer type
-                df_final[nombre_col] = df_final[nombre_col].astype(pd.Int64Dtype())
-
-    # --- 4. Completar Estado (Macro: CompletarEstadoColumnaA) ---
-    # La columna 'A' original se convierte en 'Sample Status'.
-    # La columna 'B' original se convierte en 'Report Status'.
+    # --- 4. Completar Estado ---
     if 'Report Status' in df_final.columns and 'Sample Status' in df_final.columns:
-        # Si la celda en 'Report Status' no está vacía, poner "Completed" en 'Sample Status'
-        # Usamos .loc con .copy() para evitar SettingWithCopyWarning
-        df_final.loc[df_final['Report Status'].notna() & (df_final['Report Status'] != ''), 'Sample Status'] = 'Completed'
+        mask = df_final['Report Status'].notna() & (df_final['Report Status'] != '')
+        df_final.loc[mask, 'Sample Status'] = 'Completed'
 
     return df_final
 
 def to_excel(df):
-    """Convierte un DataFrame a un objeto de bytes en formato Excel."""
+    """Convierte un DataFrame a un objeto de bytes en formato Excel con formato."""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl', datetime_format='MM/DD/YYYY') as writer:
         df.to_excel(writer, index=False, sheet_name='MobilServ_Data')
         
-        # Aplicar formato numérico a las columnas (opcional, pero mejora el resultado)
         workbook = writer.book
         worksheet = writer.sheets['MobilServ_Data']
         
-        # Formato para enteros
         formato_entero = '0'
-        # Formato para decimales
         formato_decimal = '0.00'
 
-        # Columnas enteras
         columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA", "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM", "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
-        # Columnas decimales
         columnas_decimales_letras = ["DY", "GL", "GN", "GP", "GR", "GZ", "HB", "HH", "HJ"]
 
-        header_list = list(df.columns)
+        # --- CORRECCIÓN SECUNDARIA: Lógica de formato simplificada ---
         for col_letter in columnas_enteras_letras:
-            idx = letter_to_index(col_letter)
-            if idx < len(header_list):
-                col_name = header_list[idx]
-                col_idx_in_df = df.columns.get_loc(col_name) + 1 # +1 for 1-based indexing in Excel
-                # Use worksheet.cell instead of worksheet[column_letter] for more direct access
-                # Iterate through rows to apply format
-                for row in range(2, worksheet.max_row + 1): # Start from row 2 (data rows)
-                    cell = worksheet.cell(row=row, column=col_idx_in_df)
-                    if cell.value is not None: # Apply format only if cell has a value
-                        cell.number_format = formato_entero
-
-        for col_letter in columnas_decimales_letras:
-            idx = letter_to_index(col_letter)
-            if idx < len(header_list):
-                col_name = header_list[idx]
-                col_idx_in_df = df.columns.get_loc(col_name) + 1
+            col_idx_excel = letter_to_index(col_letter) + 1 # +1 para índice base 1 de Excel
+            if col_idx_excel <= len(df.columns):
                 for row in range(2, worksheet.max_row + 1):
-                    cell = worksheet.cell(row=row, column=col_idx_in_df)
+                    cell = worksheet.cell(row=row, column=col_idx_excel)
+                    if cell.value is not None:
+                        cell.number_format = formato_entero
+        
+        for col_letter in columnas_decimales_letras:
+            col_idx_excel = letter_to_index(col_letter) + 1
+            if col_idx_excel <= len(df.columns):
+                for row in range(2, worksheet.max_row + 1):
+                    cell = worksheet.cell(row=row, column=col_idx_excel)
                     if cell.value is not None:
                         cell.number_format = formato_decimal
 
-    processed_data = output.getvalue()
-    return processed_data
+    return output.getvalue()
+
 
 # --- Interfaz de Usuario (UI) con Streamlit ---
 
 st.title("🔄 Aplicación de Conversión de Formato")
 st.markdown("Transforma archivos de **Smart Assistance** al formato requerido por **MobilServ**.")
 
-# Sección del Manual de Usuario
 with st.expander("📖 Manual de Uso (Haga clic para expandir)"):
+    # ... (Manual sin cambios) ...
     st.markdown("""
     Esta aplicación le permite convertir archivos de Excel de forma rápida y sencilla. Siga estos pasos:
 
     1.  **Cargar el Archivo**:
         -   Haga clic en el botón **"Browse files"** o arrastre y suelte su archivo de Excel en el área designada.
         -   Asegúrese de que el archivo tenga el formato original de "Smart Assistance".
-        -   El archivo debe tener los datos en una hoja llamada **"Sheet"** (asegúrese de que este es el nombre de la hoja en su archivo Excel).
+        -   El archivo debe tener los datos en una hoja llamada **"Sheet"**.
 
     2.  **Iniciar la Conversión**:
         -   Una vez cargado el archivo, aparecerá un botón llamado **"Iniciar Proceso de Conversión"**.
@@ -272,54 +225,53 @@ with st.expander("📖 Manual de Uso (Haga clic para expandir)"):
         -   Haga clic en él para guardar el archivo convertido en su computador.
     """)
 
-# Elemento gráfico que representa la conversión
 try:
+    # Intenta cargar logos, si no los encuentra, muestra un mensaje informativo.
+    # Coloca los archivos 'Smart Assistance.png' y 'MobilServ.png' en la misma carpeta que el script.
     logo_smart = Image.open("Smart Assistance.png")
     logo_mobil = Image.open("MobilServ.png")
     
     col1, col2, col3 = st.columns([2, 1, 2])
     with col1:
-        st.image(logo_smart, caption="Formato de Origen", use_container_width=True) # FIXED
+        st.image(logo_smart, caption="Formato de Origen", use_container_width=True)
     with col2:
         st.markdown("<h1 style='text-align: center; color: #007bff; margin-top: 50px;'>➡️</h1>", unsafe_allow_html=True)
     with col3:
-        st.image(logo_mobil, caption="Formato de Destino", use_container_width=True) # FIXED
+        st.image(logo_mobil, caption="Formato de Destino", use_container_width=True)
 except FileNotFoundError:
-    st.info("Logos no encontrados. Coloque 'Smart Assistance.png' y 'MobilServ.png' en la misma carpeta que la aplicación para una mejor visualización.")
+    st.info("Logos no encontrados. La funcionalidad no se ve afectada.")
 
 st.divider()
 
 # Carga de Archivo
 st.header("1. Adjunte el archivo de Excel con formato Smart Assistance")
 uploaded_file = st.file_uploader(
-    "El archivo debe contener una hoja llamada 'Sheet'", # FIXED: Consistent with read_excel
+    "El archivo debe contener una hoja llamada 'Sheet'",
     type=["xlsx", "xls"]
 )
 
 if uploaded_file is not None:
     st.success(f"Archivo cargado: **{uploaded_file.name}**")
     
-    # Botón de Inicio
     st.header("2. Inicie la transformación")
     if st.button("Iniciar Proceso de Conversión", type="primary", use_container_width=True):
         with st.spinner("Procesando... Por favor espere."):
             try:
-                # Leer los datos de la hoja "Sheet" sin encabezados
-                input_df = pd.read_excel(uploaded_file, sheet_name="Sheet", header=None) # FIXED: Consistent sheet name
+                # --- MEJORA ADICIONAL: Omitir la fila de encabezado del archivo original ---
+                # Se asume que la primera fila es el encabezado y no debe ser procesada como dato.
+                input_df = pd.read_excel(uploaded_file, sheet_name="Sheet", header=None, skiprows=1)
                 
-                # Procesar el DataFrame
                 processed_df = process_excel_file(input_df)
                 
-                # Guardar el resultado en el estado de la sesión para la descarga
                 st.session_state.processed_data = to_excel(processed_df)
                 st.session_state.processing_complete = True
+                st.session_state.file_name = uploaded_file.name
 
             except Exception as e:
                 st.error(f"Ocurrió un error durante el procesamiento: {e}")
-                st.error("Asegúrese de que el archivo cargado sea válido y contenga una hoja llamada 'Sheet'.")
+                st.error("Por favor, asegúrese de que el archivo cargado sea válido, no esté corrupto y contenga una hoja llamada 'Sheet'.")
                 st.session_state.processing_complete = False
 
-# Notificación y Descarga Post-Conversión
 if 'processing_complete' in st.session_state and st.session_state.processing_complete:
     st.balloons()
     st.success("✔️ Proceso de Conversión de formato Exitoso :)")
@@ -328,17 +280,16 @@ if 'processing_complete' in st.session_state and st.session_state.processing_com
     st.download_button(
         label="📥 Descargar archivo en formato MobilServ",
         data=st.session_state.processed_data,
-        file_name=f"CONVERTIDO_{uploaded_file.name}",
+        file_name=f"CONVERTIDO_{st.session_state.file_name}",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
 
 st.divider()
-
-# Información de Propiedad y Desarrollo
 st.markdown("""
 <div style="text-align: center; margin-top: 30px; color: grey;">
     <p>© 2025 – Todos los derechos reservados.</p>
     <p>Desarrollado por: <strong>Roberto Alvarez / RCA Smart Tools.</strong></p>
 </div>
 """, unsafe_allow_html=True)
+

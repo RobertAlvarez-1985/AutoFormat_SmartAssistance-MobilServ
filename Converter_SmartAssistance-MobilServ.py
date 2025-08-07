@@ -32,15 +32,15 @@ def process_excel_file(df):
         ("V", "L"), ("W", "O"), ("E", "AA"), ("F", "AB"), ("C", "K"), ("D", "AH"),
         ("G", "AC"), ("I", "BB"), ("J", "BC"), ("K", "BD"), ("L", "BE"), ("M", "BF"),
         ("N", "BG"), ("O", "I"), ("B", "R"),
-        ("IO", "FW"), ("MI", "CC"), ("AJ", "CG"), ("FK", "CY"), ("BV", "DA"),
-        ("IE", "DS"), ("OZ", "GT"), ("MK", "FS"), ("JQ", "ES"), ("JJ", "EM"),
-        ("HK", "GJ"), ("OB", "GH"), ("OG", "EQ"), ("MM", "EE"), ("PD", "GX"),
-        ("BI", "CK"), ("BD", "CM"), ("BM", "CO"), ("BL", "CQ"), ("JE", "EI"),
-        ("JF", "EK"), ("HQ", "FA"), ("PO", "HN"), ("BZ", "FK"), ("FB", "FM"),
+        ("IP", "FW"), ("MI", "CC"), ("AJ", "CG"), ("FL", "CY"), ("BW", "DA"),
+        ("IE", "DS"), ("PA", "GT"), ("MM", "FS"), ("JR", "ES"), ("JL", "EM"),
+        ("HK", "GJ"), ("OD", "GH"), ("OG", "EQ"), ("MO", "EE"), ("PE", "GX"),
+        ("BJ", "CK"), ("BD", "CM"), ("BN", "CO"), ("BL", "CQ"), ("JF", "EI"),
+        ("JG", "EK"), ("HQ", "FA"), ("PP", "HN"), ("BZ", "FK"), ("FB", "FM"),
         ("FC", "FO"), ("FA", "FQ"),
-        ("KB", "EW"), ("JR", "EU"), ("JU", "GN"), ("IY", "GP"), ("JV", "GR"),
+        ("KC", "EW"), ("JS", "EU"), ("JV", "GN"), ("JW", "GP"), ("JX", "GR"),
         ("IG", "GL"), ("GO", "DY"), ("AE", "HH"), ("CS", "HJ"), ("EF", "PI"),
-        ("PG", "GZ"), ("CE", "EO"), ("PC", "GV"), ("AD", "HD"), ("PH", "HB")
+        ("PH", "GZ"), ("CE", "EO"), ("PD", "GV"), ("AD", "HD"), ("PI", "HB")
     ]
 
     origen_indices = [letter_to_index(m[0]) for m in movimientos]
@@ -273,3 +273,4 @@ st.markdown("""
     <p>Desarrollado por: <strong>Roberto Alvarez / RCA Smart Tools.</strong></p>
 </div>
 """, unsafe_allow_html=True)
+

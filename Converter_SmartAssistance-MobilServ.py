@@ -141,7 +141,7 @@ def process_excel_file(df):
     columnas_fecha = ["Date Reported", "Date Sampled", "Date Registered", "Date Received"]
     for col in columnas_fecha:
         if col in df_final.columns:
-            df_final[col] = pd.to_datetime(df_final[col], errors='coerce')
+            df_final[col] = pd.to_datetime(df_final[col], errors='coerce').dt.date
 
     # Convertir columnas numéricas
     columnas_enteras_letras = ["BB", "BD", "BF", "CC", "CG", "CK", "CM", "CO", "CQ", "CY", "DA", "DS", "EE", "EI", "EK", "EM", "EQ", "ES", "EW", "FA", "FM", "FO", "FQ", "FS", "FW", "GH", "GJ", "GT", "GX", "HN"]
@@ -273,4 +273,5 @@ st.markdown("""
     <p>Desarrollado por: <strong>Roberto Alvarez / RCA Smart Tools.</strong></p>
 </div>
 """, unsafe_allow_html=True)
+
 
